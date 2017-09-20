@@ -9,7 +9,7 @@ import datetime
 
 
 def parse_date(date):
-    return int(time.mktime(datetime.strptime(date, '%Y-%m-%d').timetuple()))
+    return int(time.mktime(datetime.datetime.strptime(date, '%Y-%m-%d').timetuple()))
 
 def connect(user, password, db, host='localhost', port=5432):
     '''Returns a connection and a metadata object'''
@@ -57,7 +57,7 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
 
     Returns
     -------
-    size: int, size of query result
+    min_seq_num: int, smallest match_seq_num returned in query
     max_seq_num: int, largest match_seq_num returned in query
     '''
     # grab the next n matches with match_seq_num > seq_num
@@ -80,12 +80,13 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
 
     # calculate return values
     max_seq_num = df['match_seq_num'].max()
+    min_seq_num = df['match_seq_num'].min()
 
     # write dataframe to postgres
     df = df.drop('match_seq_num', axis=1)
     df.to_sql('matches', con, dtype={'picks_bans' : sqlalchemy.types.JSON}, if_exists='append')
 
-    return max_seq_num
+    return min_seq_num, max_seq_num
 
 def build_player_matches(con):
     '''
@@ -103,20 +104,19 @@ def build_player_matches(con):
     df = df.set_index('account_id')
     df.to_sql('player_matches', con, if_exists='replace')
 
-def append_player_matches(con, n, start_time, end_time, seq_num=0):
+def append_player_matches(con, start_time, end_time, seq_start, seq_end):
     '''
     Parameters
     ----------
     con: sqlalchemy engine object
-    n: number of matches to query for (note that we will query 10 players for each match)
     start_time: int, get player_matches occuring after this time
     end_time: int, get player_matches occuring before this time
-    seq_num: int, grab next n matches with match_seq_num > seq_num
+    seq_start: int, lower end of range of match_seq_num to filter on inclusive
+    seq_end: int, upper end of range of match_seq_num to filter on inclusive
 
     Returns
     -------
-    size: int, size of query result
-    max_seq_num: int, largest match_seq_num returned in query
+    None
     '''
 
     query = '''
@@ -126,25 +126,19 @@ def append_player_matches(con, n, start_time, end_time, seq_num=0):
     JOIN matches as m
     ON p.match_id = m.match_id
     WHERE start_time BETWEEN {start_time} AND {end_time}
-    AND match_seq_num > {seq_num}
+    AND match_seq_num BETWEEN {seq_start} AND {seq_end}
     AND m.game_mode = 2
     ORDER BY match_seq_num ASC
-    LIMIT {n}
-    '''.format(n=10*n, seq_num=seq_num, start_time=start_time, end_time=end_time)
+    '''.format(seq_start=seq_start, seq_end=seq_end, start_time=start_time, end_time=end_time)
 
     # load df
     df = request_df(query, 'account_id')
     if df.shape[0] == 0:
         return
 
-    # calculate return values
-    max_seq_num = df['match_seq_num'].max()
-
     # write dataframe to postgres
     df = df.drop('match_seq_num', axis=1)
     df.to_sql('player_matches', con, if_exists='append')
-
-    return  max_seq_num
 
 def build_heroes(con):
     '''
@@ -181,15 +175,15 @@ def build_hero_ranking(con):
     df = df.set_index('account_id')
     df.to_sql('hero_ranking', con, if_exists='replace')
 
-def append_hero_ranking(con, n, start_time, end_time, seq_num=1):
+def append_hero_ranking(con, start_time, end_time, seq_start, seq_end):
     '''
     Parameters
     ----------
     con: sqlalchemy engine object
-    n: int, number of players to query for (multiple queries per player)
     start_time: int, get player_matches occuring after this time
     end_time: int, get player_matches occuring before this time
-    seq_num: int, grab next n matches with match_seq_num > seq_num
+    seq_start: int, lower end of range of match_seq_num to filter on inclusive
+    seq_end: int, upper end of range of match_seq_num to filter on inclusive
 
     Returns
     -------
@@ -199,8 +193,7 @@ def append_hero_ranking(con, n, start_time, end_time, seq_num=1):
     query = '''
     SELECT hr.account_id as account_id,
     hr.hero_id as hero_id,
-    hr.score as score,
-    ms.min_match_seq_num as min_match_seq_num
+    hr.score as score
     FROM (
         SELECT pm.account_id as account_id,
         MIN(m.match_seq_num) as min_match_seq_num
@@ -208,27 +201,19 @@ def append_hero_ranking(con, n, start_time, end_time, seq_num=1):
         JOIN matches as m
         ON m.match_id = pm.match_id
         WHERE m.start_time BETWEEN {start_time} AND {end_time}
-        AND m.match_seq_num > {seq_num}
         GROUP BY account_id
+        HAVING MIN(m.match_seq_num) BETWEEN {seq_start} AND {seq_end}
         ORDER BY min_match_seq_num ASC
-        LIMIT {n}
         ) as ms
     JOIN hero_ranking as hr
     ON ms.account_id = hr.account_id
-    '''.format(n=n, start_time=start_time, end_time=end_time, seq_num=seq_num)
+    '''.format(start_time=start_time, end_time=end_time, seq_start=seq_start, seq_end=seq_end)
 
     df = request_df(query, 'account_id')
     if df.shape[0] == 0:
         return
 
-    # calculate return values
-    max_seq_num = df['min_match_seq_num'].max()
-    size = df.shape[0]
-
-    df = df.drop('min_match_seq_num', axis=1)
     df.to_sql('hero_ranking', con, if_exists='append')
-
-    return max_seq_num
 
 def build_mmr_estimates(con):
     '''
@@ -247,15 +232,15 @@ def build_mmr_estimates(con):
     df = df.set_index('account_id')
     df.to_sql('mmr_estimates', con, if_exists='replace')
 
-def append_mmr_estimates(con, n, start_time, end_time, seq_num=1):
+def append_mmr_estimates(con, start_time, end_time, seq_start, seq_end):
     '''
     Parameters
     ----------
     con: sqlalchemy engine object
-    n: int, number of players to query for (multiple queries per player)
     start_time: int, get player_matches occuring after this time
     end_time: int, get player_matches occuring before this time
-    seq_num: int, grab next n matches with match_seq_num > seq_num
+    seq_start: int, lower end of range of match_seq_num to filter on inclusive
+    seq_end: int, upper end of range of match_seq_num to filter on inclusive
 
     Returns
     -------
@@ -264,8 +249,7 @@ def append_mmr_estimates(con, n, start_time, end_time, seq_num=1):
     '''
     query = '''
     SELECT me.account_id as account_id,
-    me.estimate as estimate,
-    ms.min_match_seq_num as min_match_seq_num
+    me.estimate as estimate
     FROM
         (
             SELECT pm.account_id as account_id,
@@ -274,26 +258,19 @@ def append_mmr_estimates(con, n, start_time, end_time, seq_num=1):
             JOIN matches as m
             ON m.match_id = pm.match_id
             WHERE m.start_time BETWEEN {start_time} AND {end_time}
-            AND m.match_seq_num > {seq_num}
             GROUP BY account_id
+            HAVING MIN(m.match_seq_num) BETWEEN {seq_start} AND {seq_end}
             ORDER BY min_match_seq_num ASC
-            LIMIT {n}
         ) as ms
         JOIN mmr_estimates as me
         ON me.account_id = ms.account_id
-    '''.format(n=n, start_time=start_time, end_time=end_time, seq_num=seq_num)
+    '''.format(start_time=start_time, end_time=end_time, seq_start=seq_start, seq_end=seq_end)
 
     df = request_df(query, 'account_id')
     if df.shape[0] == 0:
         return
 
-    # calculate return values
-    max_seq_num = df['min_match_seq_num'].max()
-
-    df = df.drop('min_match_seq_num', axis=1)
     df.to_sql('mmr_estimates', con, if_exists='append')
-
-    return  max_seq_num
 
 def create_db(con):
     '''
@@ -314,7 +291,6 @@ def create_db(con):
     build_hero_ranking(con)
     build_mmr_estimates(con)
 
-
 if __name__ == '__main__':
     # we take in one argument, the name of the database to build
     # your pgpass needs to be set up properly to access the database we will be building
@@ -322,7 +298,7 @@ if __name__ == '__main__':
     start = parse_date('2017-05-15')
     end = parse_date('2017-09-18')
     try:
-        max_time = sys.argv[2]
+        max_time = float(sys.argv[2])
     except IndexError:
         max_time = None
 
@@ -337,33 +313,32 @@ if __name__ == '__main__':
                 con, meta = connect(user=user, password=password, db=db, host=host, port=port)
                 break
 
-    build_db(con)
+    create_db(con)
 
-    # 3 requests per second
-    # per match, at most 10 new players
-    # per player, at most 113 heroes
-    # per player, exactly one mmr estimate
-    match_seq = 0
-    pm_seq = 0
-    hr_seq = 0
-    mmr_seq = 0
-    time_0 = datetime.datetime.now()
+    # ~3 requests per second
+    time_0 = time.time()
     elapsed_time = 0
     sleep_time = .34
-    while match_seq != None and pm_seq != None and hr_seq != None and mmr_seq != None and (max_time == None or elapsed_time <= max_time):
+    match_seq_range = (0, 0)
+    print(max_time)
+    while max_time == None or elapsed_time <= max_time:
         # request 10 matches
+        match_seq_range = append_matches(con, 20, start, end, match_seq_range[1])
         time.sleep(sleep_time)
+        if match_seq_range == None:
+            break
 
         # request 100 players
-
+        append_player_matches(con, start, end, *match_seq_range)
         time.sleep(sleep_time)
 
         # request 100 player's hero ratings
-
+        append_hero_ranking(con, start, end, *match_seq_range)
         time.sleep(sleep_time)
 
         # request 100 mmr estimates
-
+        append_mmr_estimates(con, start, end, *match_seq_range)
         time.sleep(sleep_time)
 
-        elapsed_time = time.time()
+        elapsed_time = time.time() - time_0
+        print elapsed_time
