@@ -1,14 +1,13 @@
 import dota2api
 import os
 import sqlalchemy
-from build_db import connect, parse_date
+from db_helpers import connect, parse_date
 import pandas as pd
 from collections import defaultdict
 import sys
 import time
 
 api = dota2api.Initialise(os.environ['D2_API_KEY'])
-
 
 def build_matches(con):
     '''
