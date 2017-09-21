@@ -12,7 +12,10 @@ def explorer_request(request):
     explorer_url = 'https://api.opendota.com/api/explorer?sql='
     request_url = quote(request)
     r = requests.get(explorer_url + request_url)
-    rows = json.loads(r.content)['rows']
+    try:
+        rows = json.loads(r.content)['rows']
+    except ValueError:
+        import pdb; pdb.set_trace()
     return rows
 
 def load_df(rows):

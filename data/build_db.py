@@ -75,11 +75,14 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
 
     # build df
     df = request_df(query, 'match_id')
-    if df.shape == 0:
+    if df.shape[0] == 0:
         return
 
     # calculate return values
-    max_seq_num = df['match_seq_num'].max()
+    try:
+        max_seq_num = df['match_seq_num'].max()
+    except KeyError:
+        import pdb; pdb.set_trace()
     min_seq_num = df['match_seq_num'].min()
 
     # write dataframe to postgres
@@ -294,7 +297,6 @@ def create_db(con):
 if __name__ == '__main__':
     # we take in one argument, the name of the database to build
     # your pgpass needs to be set up properly to access the database we will be building
-
     start = parse_date('2017-05-15')
     end = parse_date('2017-09-18')
     try:
@@ -319,8 +321,7 @@ if __name__ == '__main__':
     time_0 = time.time()
     elapsed_time = 0
     sleep_time = .34
-    match_seq_range = (0, 0)
-    print(max_time)
+    match_seq_range = (0, 0) # next we should add something that takes a seq number and continues from there
     while max_time == None or elapsed_time <= max_time:
         # request 10 matches
         match_seq_range = append_matches(con, 20, start, end, match_seq_range[1])
@@ -341,4 +342,3 @@ if __name__ == '__main__':
         time.sleep(sleep_time)
 
         elapsed_time = time.time() - time_0
-        print elapsed_time
