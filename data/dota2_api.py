@@ -47,7 +47,7 @@ def request_matches_df(start_seq_num, n=100):
     try:
         matches = api.get_match_history_by_seq_num(start_seq_num, game_mode=2, matches_requested=n)['matches']
     except ValueError:
-        print('bad call')
+        # print('bad call')
         return
     keys = ['match_id', 'match_seq_num', 'start_time', 'players', 'duration', 'radiant_win']
     for key in keys:
@@ -83,11 +83,11 @@ def append_matches_by_seq(con, start_seq, end_time, n=100, max_duration=None):
     time_0 = time.time()
     elapsed_time = 0
     errors = 0
-    while (max_duration == None or elapsed_time < max_duration) and errors < 100:
+    while (max_duration == None or elapsed_time < max_duration):
         df = request_matches_df(current_seq, n)
         if not isinstance(df, pd.DataFrame):
             errors += 1
-            print('bad call')
+            # print('bad call')
             time.sleep(4.0)
             continue
         current_seq = df['match_seq_num'].max() + 1
