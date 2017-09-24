@@ -1,3 +1,7 @@
+# python data/multithreading.py <action> <db name> <duration> <start match_id> <end match_id>
+# use duration = 0 for no time limit, start_matcH_id = 0 for no start_match_id
+# need to test end_seq_num
+# python data/multithreading.py append dota2_draft 100 3460288805 3460288707
 import dota2api
 from threading import Thread
 from Queue import Queue, Empty, PriorityQueue
@@ -34,18 +38,19 @@ class Scheduler(object):
             self.task_queue.put(item)
             time.sleep(self.schedule)
 
-def append_data(start_match_seq_num, end_match_seq_num, duration, num_workers, con):
+def append_data(start_match_id, end_match_id, duration, num_workers, con):
         workers = []
         q = Queue()
         scheduler = Scheduler(q, 1)
         time0 = time.time()
         for i in xrange(num_workers):
             workers.append(Worker(task=task, args=(q, scheduler.heap, con)))
-        scheduler.heap.put((3, (get_match_history, start_match_seq_num,
-                                end_match_seq_num, time0, duration)))
+        scheduler.heap.put((3, (get_match_history, start_match_id,
+                                end_match_id, time0, duration)))
         scheduler.heap.join()
         q.join()
         print('done')
+        print('ran for {} seconds'.format(time.time() - time0))
 
 if __name__ == '__main__':
     try:
@@ -66,11 +71,13 @@ if __name__ == '__main__':
     else:
         duration = int(sys.argv[3])
         try:
-            start_match_seq_num = int(sys.argv[4])
+            start_match_id = int(sys.argv[4])
         except IndexError:
-            start_match_seq_num = None
+            start_match_id = None
+        if start_match_id == 0:
+            start_match_id = None
         try:
-            end_match_seq_num = int(sys.argv[5])
+            end_match_id = int(sys.argv[5])
         except IndexError:
-            end_match_seq_num = None
-        append_data(start_match_seq_num, end_match_seq_num, duration, 4, con)
+            end_match_id = None
+        append_data(start_match_id, end_match_id, duration, 4, con)

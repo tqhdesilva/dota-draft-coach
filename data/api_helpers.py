@@ -18,40 +18,47 @@ def api_call(args, out_q, con):
     method(*args, out_q=out_q, con=con)
     out_q.task_done()
 
-def parse_match_history(result, end_match_seq_num):
+def parse_match_history(result, end_match_id):
     parsed_result = result['matches']
     df_dict = defaultdict(list)
-    keys = ['match_id', 'match_seq_num', 'players', 'start_time']
+    keys = ['match_id', 'players', 'start_time']
     for row in parsed_result:
         for key in keys:
             df_dict[key].append(row[key])
-    df = pd.DataFrame(df_dict)
-    if end_match_seq_num != None:
-        df = df[df['match_seq_num'] >= end_match_seq_num]
+    df = pd.DataFrame(df_dict, columns=keys)
+    if end_match_id != None:
+        df = df[df['match_id'] >= end_match_id]
+    # because dota 2 web api sucks donkey dick, we need to manually filter for
+    # matches where player count == 10 (not necessarily AP games)
+    # hopefully for any given set of 500 matches at least one has 10 players,
+    # otherwise our program breaks
+    # the API decides to randomly work sometimes and game_mode=2 returns different
+    # results for the same starting_match_id
+    # wtf valve
+    df = df[df['players']]
     df = df.set_index('match_id')
     return df
 
 def parse_match_details(result):
     keys = ['match_id', 'radiant_win', 'duration']
     parsed_result = {key : [result[key]] for key in keys}
-    df = pd.DataFrame(parsed_result)
+    df = pd.DataFrame(parsed_result, columns=keys)
     df = df.set_index('match_id')
     return df
 
-def get_match_history(match_seq_num, end_match_seq_num, time0, duration, out_q, con):
+def get_match_history(start_match_id, end_match_id, time0, duration, out_q, con):
     try:
-        result = api.get_match_history(game_mode=2, start_at_match_seq_num=match_seq_num)
+        result = api.get_match_history(game_mode=2, start_at_match_id=start_match_id)
     except ValueError:
-        args = (get_match_history, match_seq_num)
+        args = (get_match_history, start_match_id, end_match_id, time0, duration)
         out_q.put((1, args))
         return
-    result_df = parse_match_history(result, end_match_seq_num)
-
+    result_df = parse_match_history(result, end_match_id)
     append_db_match_history(result_df, con)
     for match_id in result_df.index:
         out_q.put((2, (get_match_details, match_id)))
-    if time.time() - time0 < duration - result_df.shape[0] and result_df.shape[0] > 0:
-        args = (get_match_history, result_df['match_seq_num'].min() - 1, time0, duration)
+    if (duration <= 0 or time.time() - time0 < duration - result_df.shape[0]) and result_df.shape[0] > 0:
+        args = (get_match_history, result_df.index.min() - 1, end_match_id ,time0, duration)
         out_q.put((3, args))
 
 
