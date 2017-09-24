@@ -1,3 +1,5 @@
+# python dota2_api.py <action> <db name> <start_seq_num> <duration> <end time>
+# python dota2_api.py append dota-draft
 import dota2api
 import os
 import sqlalchemy
@@ -69,7 +71,7 @@ def append_matches(con, df):
     '''
     df.to_sql('matches', con, dtype={'players' : sqlalchemy.types.JSON}, if_exists='append')
 
-def append_matches_by_seq(con, start_seq, end_time, n=100, max_duration=None):
+def append_matches_by_seq(con, start_seq, end_time=0, n=100, max_duration=None):
     '''
     con: sqlalchemy engine object
     start_seq: int, largest sequence number of matches to filter by
@@ -117,6 +119,8 @@ if __name__ == '__main__':
     elif action == 'append':
         duration = int(sys.argv[3])
         start_seq = 2778110720 if len(sys.argv) < 5 else int(sys.argv[4]) # just a random match_seq_num from our desired start date
-
-        end_time = parse_date('2017-09-18')
+        if len(sys.argv) >= 6:
+            end_time = sys.argv[5]
+        else:
+            end_time = parse_date('2017-09-18')
         append_matches_by_seq(con, start_seq, end_time, n=100, max_duration=duration)

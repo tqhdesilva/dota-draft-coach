@@ -278,8 +278,8 @@ def create_db(con):
 if __name__ == '__main__':
     # we take in one argument, the name of the database to build
     # your pgpass needs to be set up properly to access the database we will be building
-    start = parse_date('2017-05-15')
-    end = parse_date('2017-09-18')
+    start = 1351237677 #parse_date('2017-05-15')
+    end = 1506284352 #parse_date('2017-09-18')
     try:
         max_time = float(sys.argv[2])
     except IndexError:
