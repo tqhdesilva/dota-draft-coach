@@ -3,6 +3,7 @@ import requests
 import json
 from collections import defaultdict
 import pandas as pd
+import time
 
 def explorer_request(request):
     '''
@@ -15,7 +16,9 @@ def explorer_request(request):
     try:
         rows = json.loads(r.content)['rows']
     except ValueError:
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
+        time.sleep(.34)
+        return explorer_request(request)
     return rows
 
 def load_df(rows):

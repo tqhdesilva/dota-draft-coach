@@ -50,6 +50,7 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
     WHERE start_time BETWEEN {start_time} AND {end_time}
     AND match_seq_num > {seq_num}
     AND game_mode = 2
+    AND picks_bans IS NOT NULL
     ORDER BY match_seq_num ASC
     LIMIT {n};
     '''.format(start_time=start_time, end_time=end_time, n=n, seq_num=seq_num)
@@ -60,10 +61,7 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
         return
 
     # calculate return values
-    try:
-        max_seq_num = df['match_seq_num'].max()
-    except KeyError:
-        import pdb; pdb.set_trace()
+    max_seq_num = df['match_seq_num'].max()
     min_seq_num = df['match_seq_num'].min()
 
     # write dataframe to postgres
@@ -278,8 +276,8 @@ def create_db(con):
 if __name__ == '__main__':
     # we take in one argument, the name of the database to build
     # your pgpass needs to be set up properly to access the database we will be building
-    start = parse_date('2017-05-15')
-    end = parse_date('2017-09-18')
+    start = 1351237677 #parse_date('2017-05-15')
+    end = 1506284352 #parse_date('2017-09-18')
     try:
         max_time = float(sys.argv[2])
     except IndexError:
