@@ -50,6 +50,7 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
     WHERE start_time BETWEEN {start_time} AND {end_time}
     AND match_seq_num > {seq_num}
     AND game_mode = 2
+    AND picks_bans IS NOT NULL
     ORDER BY match_seq_num ASC
     LIMIT {n};
     '''.format(start_time=start_time, end_time=end_time, n=n, seq_num=seq_num)
