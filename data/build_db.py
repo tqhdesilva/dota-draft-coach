@@ -60,10 +60,7 @@ def append_matches( con, n, start_time, end_time, seq_num=0):
         return
 
     # calculate return values
-    try:
-        max_seq_num = df['match_seq_num'].max()
-    except KeyError:
-        import pdb; pdb.set_trace()
+    max_seq_num = df['match_seq_num'].max()
     min_seq_num = df['match_seq_num'].min()
 
     # write dataframe to postgres
