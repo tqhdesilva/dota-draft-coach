@@ -2,8 +2,6 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-
-sys.path.append(os.path.join( '..', 'data'))
 from build_db import connect
 from db_helpers import parse_date
 
@@ -53,9 +51,10 @@ def preprocess_players(df):
     dire_picks = parsed_series.map(lambda x: x[1])
     picks_df = pd.DataFrame(data={'radiant_picks': radiant_picks,
                                   'dire_picks': dire_picks})
-    radiant_dummies = pd.get_dummies(picks_df['radiant_picks'].apply(pd.Series).stack(),
+    radiant_dummies = pd.get_dummies(picks_df['radiant_picks'].apply(pd.Series).stack().astype('category', categories=range(1,115)),
                                      prefix='radiant', prefix_sep='_').sum(level=0)
-    dire_dummies = pd.get_dummies(picks_df['dire_picks'].apply(pd.Series).stack(),
+                                     # .astype('category', categories=range(1, 115))
+    dire_dummies = pd.get_dummies(picks_df['dire_picks'].apply(pd.Series).stack().astype('category', categories=range(1,115)),
                                   prefix='dire', prefix_sep='_').sum(level=0)
     df = pd.concat([df[['match_id', 'radiant_win']], radiant_dummies, dire_dummies],
                    axis=1)
@@ -68,8 +67,8 @@ def preprocess(df):
     t2_picks = parsed_series.map(lambda x: x['t2_picks'])
     team1 = parsed_series.map(lambda x: x['team1'])
     picks_df = pd.DataFrame(data={'t1_picks': t1_picks, 't2_picks':t2_picks, 'team1': team1})
-    t1_dummies = pd.get_dummies(picks_df['t1_picks'].apply(pd.Series).stack(), prefix='t1', prefix_sep='_').sum(level=0)
-    t2_dummies = pd.get_dummies(picks_df['t2_picks'].apply(pd.Series).stack(), prefix='t2', prefix_sep='_').sum(level=0)
+    t1_dummies = pd.get_dummies(picks_df['t1_picks'].apply(pd.Series).stack().astype('category', categories=range(1,115)), prefix='t1', prefix_sep='_').sum(level=0)
+    t2_dummies = pd.get_dummies(picks_df['t2_picks'].apply(pd.Series).stack().astype('category', categories=range(1,115)), prefix='t2', prefix_sep='_').sum(level=0)
     df['team1_win'] = (picks_df['team1'] == 1) ^ (df['radiant_win'])
     df = pd.concat([df[['match_id', 'team1_win']], t1_dummies, t2_dummies], axis=1)
     df['team1'] = team1
