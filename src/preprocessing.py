@@ -4,6 +4,16 @@ import pandas as pd
 import numpy as np
 from build_db import connect
 from db_helpers import parse_date
+from scipy.sparse import csc_matrix, hstack
+
+def polynomial_features(X):
+    X_sparse = csc_matrix(X)
+    sparse_product = []
+    for i in xrange(X.shape[1] -1 ):
+        for j in xrange(i, X.shape[1]):
+            sparse_product.append(X_sparse[:, i].multiply(X_sparse[:, j]))
+    X_sparse_poly = hstack(sparse_product)
+    return X_sparse_poly
 
 def parse_pb(pb_list):
     # return t1_picks, t2_picks, t1_bans, t2_bans
@@ -73,3 +83,4 @@ def preprocess(df):
     df = pd.concat([df[['match_id', 'team1_win']], t1_dummies, t2_dummies], axis=1)
     df['team1'] = team1
     return df
+
